@@ -1,0 +1,85 @@
+version: 1
+rules:
+  - area: payments
+    priority: 10
+    patterns:
+      - "**/payment*/**"
+      - "**/payment*"
+      - "**/billing/**"
+      - "**/checkout/**"
+      - "**/stripe/**"
+      - "**/invoice*"
+
+  - area: auth
+    priority: 20
+    patterns:
+      - "**/auth/**"
+      - "**/auth*"
+      - "**/session*"
+      - "**/login*"
+      - "**/logout*"
+      - "**/oauth/**"
+      - "**/jwt*"
+      - "**/token*"
+
+  - area: db
+    priority: 30
+    patterns:
+      - "**/migration*/**"
+      - "**/migration*"
+      - "**/*.sql"
+      - "**/database/**"
+      - "**/db/**"
+      - "**/repository/**"
+      - "**/repo/**"
+
+  - area: retry
+    priority: 40
+    patterns:
+      - "**/retry*"
+      - "**/backoff*"
+      - "**/circuit*"
+
+  - area: config
+    priority: 50
+    patterns:
+      - "**/*.yaml"
+      - "**/*.yml"
+      - "**/*.toml"
+      - "**/*.env"
+      - "**/*.env.*"
+      - "**/config/**"
+      - "**/settings/**"
+
+  - area: infra
+    priority: 60
+    patterns:
+      - "**/Dockerfile"
+      - "**/Dockerfile.*"
+      - "**/*.tf"
+      - "**/*.tfvars"
+      - "**/k8s/**"
+      - "**/helm/**"
+      - "**/.github/**"
+      - "**/ci/**"
+      - "**/deploy/**"
+
+  - area: tests
+    priority: 70
+    patterns:
+      - "**/*_test.go"
+      - "**/test/**"
+      - "**/tests/**"
+      - "**/spec/**"
+      - "**/__tests__/**"
+      - "**/*.test.*"
+      - "**/*.spec.*"
+
+  - area: docs
+    priority: 80
+    patterns:
+      - "**/*.md"
+      - "**/*.rst"
+      - "**/*.txt"
+      - "**/docs/**"
+      - "**/doc/**"
