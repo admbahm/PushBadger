@@ -4,19 +4,30 @@ PushBadger analyzes git diffs and maps changed files to risk areas using
 deterministic, path-based heuristics. No AI — just fast, reproducible signal
 about which parts of your codebase are touched by a change.
 
+## Requirements
+
+- Go 1.24+
+- git
+
 ## Install
 
+**Build from source:**
+
 ```sh
-go install pushbadger/cmd/pushbadger@latest
+git clone <repo-url>
+cd pushbadger
+make build          # produces ./pushbadger
 ```
 
-Or build from source:
+Or without Make:
 
 ```sh
-git clone <repo>
-cd pushbadger
 go build -o pushbadger ./cmd/pushbadger
 ```
+
+> A versioned binary release is planned. Until then, build from source.
+> `go install` requires the module to be published at a public module path,
+> which has not been done yet.
 
 ## Usage
 
@@ -32,8 +43,8 @@ Flags:
   --rules string   Path to custom rules YAML file
 ```
 
-**Diff modes** — pick at most one group; combining --staged or --working with
---base/--head exits 2 with a specific error message:
+**Diff modes** — pick at most one group; combining `--staged` or `--working`
+with `--base`/`--head` exits 2 with a specific error message:
 
 | Command | What it diffs |
 |---|---|
@@ -50,43 +61,35 @@ Flags:
 3. First of `main`, `master`, `trunk` that exists
 4. Hard fail (exit 2) if none found
 
-## Self-referential example
+## How matching works
 
-Running pushbadger on the pushbadger repo itself makes a good smoke test and
-doubles as a canonical determinism fixture (same ruleset, same diff, always the
-same output).
+Each rule defines a named area, a priority, and a list of
+[doublestar](https://github.com/bmatcuk/doublestar) glob patterns. On each run:
 
-```
-$ pushbadger analyze --base $(git rev-list --max-parents=0 HEAD) --head HEAD
+1. The changed file list is collected from `git diff`.
+2. Every file path is normalized to lowercase before pattern matching.
+3. Each file is tested against every rule's patterns in priority order.
+4. A file may match multiple areas and will appear in each matched area.
+5. Files that match no rule are collected into the `unclassified` area, which
+   is always sorted last regardless of how many areas matched.
+6. Within each area, files are sorted by path. Areas are sorted by priority
+   (ascending), then by name for ties.
 
-Risk analysis: <initial-sha>...HEAD
+### Matching examples
 
-config (6 files)
-  CHANGELOG.md [→ matched by docs too]
-  config/embed.go
-  config/risk_rules.yaml
-  go.mod
-  go.sum
-  ...
+Using the default embedded ruleset:
 
-tests (2 files)
-  internal/analyzer/heuristics_test.go
-  test/integration/analyze_test.go
+| File path | Matched area(s) | Notes |
+|---|---|---|
+| `services/payments/processor.go` | `payments` | matches `**/payment*/**` |
+| `pkg/auth/session_test.go` | `auth`, `tests` | matches `**/auth/**` and `**/*_test.go` |
+| `internal/retry/backoff.go` | `retry` | matches `**/backoff*` |
+| `docs/adr/0001-risk-model.md` | `docs` | matches `**/*.md` and `**/docs/**` |
+| `scripts/release.sh` | `unclassified` | no rule covers `.sh` files |
 
-docs (3 files)
-  CHANGELOG.md
-  README.md
-  ...
-
-unclassified (N files)
-  cmd/pushbadger/main.go
-  internal/analyzer/heuristics.go
-  ...
-
-N files, M areas
-```
-
-(Exact output varies with the commit range; the structure is stable.)
+A file like `pkg/auth/session_test.go` appears in both `auth` (priority 20)
+and `tests` (priority 70). Because areas are sorted by priority, `auth` always
+precedes `tests` in the output.
 
 ## Example output
 
@@ -176,7 +179,7 @@ pushbadger v0.1.0-alpha (ruleset version 1)
 ```
 
 The `ruleset_version` field is also included in every JSON report, so consumers
-can detect if they are comparing reports produced with different rulesets.
+can detect when reports are produced with different rulesets.
 
 ## Ruleset format
 
@@ -204,12 +207,6 @@ rules:
 - `rules[].area` — name of the risk area
 - `rules[].priority` — lower number = higher priority; controls sort order in output
 - `rules[].patterns` — [doublestar](https://github.com/bmatcuk/doublestar) glob patterns matched against the lowercased file path
-
-**Matching rules:**
-- Patterns use `github.com/bmatcuk/doublestar/v4` (`**` matches path separators)
-- Matching is case-insensitive (paths are lowercased before matching)
-- A file can match multiple areas and will appear in each
-- Files with no match appear in the `unclassified` area at the end
 
 ## Limits and truncation
 
@@ -240,8 +237,83 @@ rules:
 
 ## Determinism
 
-Same diff + same ruleset = byte-identical output (text and JSON). No timestamps
-are included in output. The integration test suite asserts this property on
-every run.
+Same diff + same ruleset version = byte-identical output (text and JSON). No
+timestamps are included in output.
+
+**What is deterministic:**
+- File lists within each area are sorted by path.
+- Areas are sorted by priority (ascending), then name for ties.
+- `unclassified` is always last.
+- The `ruleset_version` field lets consumers detect ruleset changes between runs.
+
+The integration test suite (`test/integration/`) creates a real temporary git
+repository on every run and verifies these properties end-to-end:
+
+- The same fixture diff produces byte-identical JSON across five consecutive runs.
+- A file that matches multiple areas always appears in those areas in the same
+  priority order across repeated runs.
+- Files with no matching rule always land in `unclassified`, which is always last.
+- Every JSON report includes a `ruleset_version` field.
+
+Run the full suite:
+
+```sh
+go test ./...
+# or
+make test
+```
+
+Run only integration tests:
+
+```sh
+go test ./test/integration/
+```
+
+## Development
+
+```sh
+make build   # compile to ./pushbadger
+make test    # go test ./...
+make lint    # go vet ./...
+make clean   # remove ./pushbadger binary
+```
+
+## Self-referential smoke test
+
+Running PushBadger on its own repository is a good sanity check and doubles as
+a canonical determinism fixture (same commit range + same ruleset = same output):
+
+```
+$ pushbadger analyze --base $(git rev-list --max-parents=0 HEAD) --head HEAD
+
+Risk analysis: <initial-sha>...HEAD
+
+config (2 files)
+  config/embed.go
+  config/risk_rules.yaml
+
+tests (2 files)
+  internal/analyzer/heuristics_test.go
+  test/integration/analyze_test.go
+
+docs (2 files)
+  CHANGELOG.md
+  README.md
+
+unclassified (10 files)
+  LICENSE
+  cmd/pushbadger/main.go
+  go.mod
+  go.sum
+  internal/analyzer/heuristics.go
+  ...
+```
+
+(Exact file counts grow as the repo does; area assignments and sort order are stable.)
+
+## Acknowledgments
+
+Built with assistance from [Claude Code](https://claude.ai/claude-code),
+Anthropic's AI coding assistant.
 
 Copyright 2026 Adam Deane

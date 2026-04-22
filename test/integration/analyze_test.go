@@ -300,6 +300,98 @@ func TestRulesetVersionInReport(t *testing.T) {
 	}
 }
 
+// TestMultiMatchOrderingStable verifies that a file matching multiple areas
+// always lands in the same areas in the same order across repeated runs.
+func TestMultiMatchOrderingStable(t *testing.T) {
+	dir, baseRef := fixtureRepo(t)
+
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer os.Chdir(origDir) //nolint:errcheck
+
+	// Add a file that matches two rules: auth (*/auth/**) and tests (*_test.go).
+	authTestFile := filepath.Join(dir, "internal", "auth", "session_test.go")
+	if err := os.WriteFile(authTestFile, []byte("package auth\n"), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	gitCmd := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	gitCmd("add", "internal/auth/session_test.go")
+	gitCmd("commit", "-m", "add auth test")
+
+	rules, _, err := analyzer.LoadRuleset("")
+	if err != nil {
+		t.Fatalf("LoadRuleset: %v", err)
+	}
+
+	run := func() []string {
+		result, err := git.GetChangedFiles(git.DiffOptions{Base: baseRef, Head: "HEAD"})
+		if err != nil {
+			t.Fatalf("GetChangedFiles: %v", err)
+		}
+		areas := analyzer.Match(result.Files, rules)
+		names := make([]string, len(areas))
+		for i, a := range areas {
+			names[i] = a.Name
+		}
+		return names
+	}
+
+	first := run()
+	for i := 0; i < 5; i++ {
+		got := run()
+		if len(got) != len(first) {
+			t.Fatalf("run %d area count differs: got %v want %v", i+1, got, first)
+		}
+		for j := range got {
+			if got[j] != first[j] {
+				t.Fatalf("run %d area[%d] differs: got %q want %q", i+1, j, got[j], first[j])
+			}
+		}
+	}
+
+	// session_test.go must appear in both auth and tests.
+	areaNames := first
+	inAuth, inTests := false, false
+	for _, n := range areaNames {
+		if n == "auth" {
+			inAuth = true
+		}
+		if n == "tests" {
+			inTests = true
+		}
+	}
+	if !inAuth {
+		t.Error("auth area missing; expected session_test.go to match")
+	}
+	if !inTests {
+		t.Error("tests area missing; expected session_test.go to match")
+	}
+
+	// auth (priority 20) must sort before tests (priority 70).
+	authIdx, testsIdx := -1, -1
+	for i, n := range areaNames {
+		if n == "auth" {
+			authIdx = i
+		}
+		if n == "tests" {
+			testsIdx = i
+		}
+	}
+	if authIdx >= testsIdx {
+		t.Errorf("auth (priority 20) should precede tests (priority 70), got order: %v", areaNames)
+	}
+}
+
 func filePaths(files []types.ChangedFile) []string {
 	paths := make([]string, len(files))
 	for i, f := range files {
