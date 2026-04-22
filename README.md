@@ -241,7 +241,7 @@ rules:
 ## Determinism
 
 Same diff + same ruleset = byte-identical output (text and JSON). No timestamps
-
-## Copyright 2026 Adam Deane
 are included in output. The integration test suite asserts this property on
 every run.
+
+Copyright 2026 Adam Deane
