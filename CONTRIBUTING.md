@@ -26,6 +26,12 @@ under the Apache 2.0 license, the same license as this project.
 
 ## AI-assisted development
 
-This project was developed with AI assistance (Claude Code) and that's fine.
-Contributions written with AI assistance are welcome — what matters is that the
-code is correct, tested, and that you understand what you're submitting.
+AI-assisted contributions are welcome when the contributor:
+
+- understands the submitted change;
+- has tested it;
+- can explain its behavior; and
+- can provide evidence supporting its correctness.
+
+The contribution is evaluated on its engineering evidence, not on which tool
+or provider helped produce it.

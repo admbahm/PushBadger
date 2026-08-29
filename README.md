@@ -1,8 +1,18 @@
 # PushBadger
 
-PushBadger analyzes git diffs and maps changed files to risk areas using
-deterministic, path-based heuristics. No AI, no network calls — just fast,
-reproducible signal about which parts of your codebase a change touches.
+PushBadger is a deterministic PR assurance engine with two trusted-core
+capabilities:
+
+- **MAP — `pushbadger analyze`:** Git changes become reproducible risk areas
+  through deterministic, path-based rules.
+- **ADMIT — `pushbadger validate <evidence.json>`:** Untrusted review evidence
+  crosses a strict validation boundary and is admitted or rejected.
+
+Both capabilities run without AI or network access. PushBadger does not invoke
+an AI provider or trust evidence merely because a particular investigator
+produced it.
+
+> Trust the evidence, not the agent.
 
 ## Why PushBadger exists
 
@@ -13,33 +23,62 @@ PushBadger is built to be a deterministic alternative for:
 - **Regression Detection**: Consistent mapping of changes to functional areas to spot unintended side effects.
 - **Audit Environments**: A stable trail of risk assessment that remains identical across repeated runs.
 
-## Where PushBadger fits in a pipeline
+## Architecture
 
-PushBadger ensures a consistent role as part of a CI/CD workflow. It operates purely on git diff output and does not require repository modification or external services.
+```text
+MAP -> INVESTIGATE -> ADMIT
+```
 
-Typical usage:
+- **MAP** is PushBadger's deterministic analysis of Git changes into risk
+  areas. A risk area scopes review; it is not proof of a defect.
+- **INVESTIGATE** is external and untrusted. An investigator may be a human,
+  Codex, Gemini, a local model, or another review system. Its job is to produce
+  evidence, not to decide what PushBadger must believe.
+- **ADMIT** is PushBadger's deterministic evidence trust boundary. It strictly
+  parses, validates, and applies admission policy to the submitted evidence.
 
-1. A pull request is opened or updated
-2. CI generates a diff against the base branch
-3. PushBadger analyzes the diff using the embedded ruleset
-4. Output is used to:
-   - gate merges (e.g. fail on high-risk changes)
-   - annotate PRs
-   - feed downstream automation
+MAP and ADMIT belong to PushBadger's trusted deterministic core. INVESTIGATE
+does not:
+
+```text
+                    UNTRUSTED
+
+          human / external investigator
+                     |
+                     v
+                evidence.json
+                     |
+  ============== TRUST BOUNDARY ==============
+                     |
+                     v
+             PushBadger ADMIT
+```
+
+PushBadger can be used for MAP alone or as part of an end-to-end review
+pipeline. A typical integrated flow is:
+
+1. A pull request is opened or updated.
+2. PushBadger maps its diff using the embedded or selected ruleset.
+3. An external investigator examines the scoped change and produces evidence.
+4. PushBadger admits or rejects that evidence through Evidence Contract v1.
+5. Deterministic output can feed merge gates, PR annotations, or other
+   downstream automation.
 
 Because outputs are deterministic, results can be:
+
 - cached
 - compared across runs
 - used as reliable inputs to other systems
 
-- **Deterministic.** Same diff + same ruleset = byte-identical output.
-- **Path-based.** Doublestar globs over lowercased file paths.
-- **Self-contained.** Embedded default ruleset, single static binary, no runtime dependencies beyond `git`.
+- **Deterministic.** Identical supported inputs produce byte-identical output.
+- **Path-based MAP.** Doublestar globs over lowercased file paths.
+- **Self-contained.** A single static binary with no required external service;
+  only `analyze` requires `git`.
 
 ## Requirements
 
 - Go 1.24+ (only required to build from source)
-- `git` on `PATH`
+- `git` on `PATH` for `analyze`; `validate` does not require it
 
 ## Install
 
@@ -92,6 +131,8 @@ pushbadger analyze --base main --format json   # machine-readable
 
 ## Usage
 
+### Analyze changes
+
 ```
 pushbadger analyze [flags]
 
@@ -103,6 +144,25 @@ Flags:
   --format string  Output format: text or json (default: text)
   --rules string   Path to custom rules YAML file (default: embedded ruleset)
 ```
+
+### Validate evidence
+
+```sh
+pushbadger validate .review/examples/benchmark-001.json
+```
+
+`validate` accepts exactly one Evidence Contract v1 JSON file and does not
+require a Git repository. The admission boundary provides:
+
+- strict JSON parsing and recursive duplicate-key rejection;
+- exact supported numeric semantics without floating-point coercion;
+- structural, schema-compatible validation;
+- semantic finding and verdict admission policy;
+- a deterministic admission result.
+
+Valid evidence prints `valid` and exits 0. Invalid or unreadable evidence is
+reported on stderr and exits 1. Missing or extra arguments are usage errors and
+exit 2.
 
 ## Example: CI usage
 
@@ -335,7 +395,7 @@ two reports were produced under different rulesets.
 
 ## Constraints and Failure Modes
 
-PushBadger intentionally limits analysis scope:
+The MAP command intentionally limits analysis scope:
 
 - Maximum of 200 files per diff
 - Maximum diff size of 200 KB
@@ -347,7 +407,7 @@ These constraints ensure:
 - stable execution in CI environments
 
 PushBadger does not:
-- analyze file contents beyond diff scope
+- have `analyze` inspect file contents beyond diff scope
 - rely on external services
 - introduce non-deterministic behavior
 
@@ -371,8 +431,9 @@ If either limit is hit, `truncated: true` is set on the JSON report, a
 
 | Code | Meaning |
 |---|---|
-| 0 | Success |
-| 2 | Usage error or git error (not in a repo, bad flags, base unresolved) |
+| 0 | Success; for `validate`, evidence was admitted |
+| 1 | `validate` rejected invalid or unreadable evidence |
+| 2 | Usage error or `analyze` git error (not in a repo, bad flags, base unresolved) |
 | 3 | Internal failure |
 
 ## Determinism
@@ -433,6 +494,12 @@ Integration tests only:
 go test ./test/integration/
 ```
 
+## Documentation
+
+- [Architecture and trust boundary](docs/architecture.md)
+- [Evidence Contract v1 port and parity requirements](docs/evidence-contract-port.md)
+- [Development guide](docs/development.md)
+
 ## Development
 
 ```sh
@@ -476,10 +543,5 @@ unclassified (10 files)
 
 Exact file counts grow as the repo does; area assignments and sort order are
 stable. See [DOGFOOD.md](DOGFOOD.md) for ongoing observations.
-
-## Acknowledgments
-
-Built with assistance from [Claude Code](https://claude.ai/claude-code),
-Anthropic's AI coding assistant.
 
 Copyright 2026 Adam Deane. Licensed under the Apache 2.0 license — see [LICENSE](LICENSE).
