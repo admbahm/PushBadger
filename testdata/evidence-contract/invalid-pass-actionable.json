@@ -1,0 +1,19 @@
+{
+  "schema_version": "3",
+  "review": {"repository": "admbahm/PushBadger", "pr": 1, "base_sha": "1111111", "head_sha": "2222222", "verdict": "PASS"},
+  "verification": [{"id": "required-suite", "type": "test", "required": true, "outcome": "PASS", "detail": "Required verification passed."}],
+  "findings": [{
+    "id": "DI-REV-001",
+    "classification": "PROVEN",
+    "severity": "high",
+    "claim": "Actionable finding must prevent PASS.",
+    "affected_behavior": "Verdict admission",
+    "locations": [{"path": "internal/review/validator.go"}],
+    "evidence": [{"type": "code_path", "qualification": "UNAVOIDABLE", "detail": "The failing path is unavoidable."}],
+    "expected": "PASS is rejected.",
+    "observed": "An actionable finding is present.",
+    "reproduction": ["Validate this document."],
+    "attempted_disproof": ["None; this is a contract fixture."],
+    "remaining_uncertainty": ""
+  }]
+}
