@@ -1,0 +1,6 @@
+{
+  "schema_version": "3",
+  "review": {"repository": "admbahm/PushBadger", "pr": 0.99999999999999999, "base_sha": "1111111", "head_sha": "2222222", "verdict": "PASS"},
+  "verification": [{"id": "required-suite", "type": "test", "required": true, "outcome": "PASS", "detail": "Required verification passed."}],
+  "findings": []
+}

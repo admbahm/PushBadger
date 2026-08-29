@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "cases": [
+    {"path": "valid-pass.json", "valid": true, "purpose": "PASS with completed required verification and no actionable findings"},
+    {"path": "valid-inconclusive.json", "valid": true, "purpose": "INCONCLUSIVE with incomplete required verification"},
+    {"path": "invalid-pass-actionable.json", "valid": false, "purpose": "PASS cannot contain an actionable finding"},
+    {"path": "invalid-high-confidence-observed.json", "valid": false, "purpose": "HIGH_CONFIDENCE cannot be admitted by OBSERVED code-path evidence"},
+    {"path": "invalid-near-integer-pr.json", "valid": false, "purpose": "Near-integer PR number must not round into schema validity"},
+    {"path": "invalid-duplicate-key.json", "valid": false, "purpose": "Duplicate object keys must be rejected before schema admission"}
+  ]
+}

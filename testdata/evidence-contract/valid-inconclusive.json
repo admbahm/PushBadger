@@ -1,0 +1,6 @@
+{
+  "schema_version": "3",
+  "review": {"repository": "admbahm/PushBadger", "pr": 1, "base_sha": "1111111", "head_sha": "2222222", "verdict": "INCONCLUSIVE"},
+  "verification": [{"id": "required-runtime", "type": "test", "required": true, "outcome": "NOT_RUN", "detail": "Required runtime verification could not be completed."}],
+  "findings": []
+}
