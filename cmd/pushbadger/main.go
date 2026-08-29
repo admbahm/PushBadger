@@ -1,17 +1,21 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 	"pushbadger/internal/analyzer"
+	"pushbadger/internal/evidence"
 	"pushbadger/internal/git"
 	"pushbadger/internal/output"
 	"pushbadger/pkg/types"
 )
 
 const appVersion = "v0.1.0-alpha"
+
+var errEvidenceInvalid = errors.New("evidence is invalid")
 
 func main() {
 	// Load the embedded ruleset once at startup to get its version number.
@@ -23,7 +27,9 @@ func main() {
 		os.Exit(3)
 	}
 
-	if err := rootCmd(rulesetVer).Execute(); err != nil {
+	if err := rootCmd(rulesetVer).Execute(); errors.Is(err, errEvidenceInvalid) {
+		os.Exit(1)
+	} else if err != nil {
 		os.Exit(2)
 	}
 }
@@ -38,7 +44,31 @@ func rootCmd(rulesetVersion int) *cobra.Command {
 	}
 	root.SetVersionTemplate("{{.Name}} {{.Version}}\n")
 	root.AddCommand(analyzeCmd(rulesetVersion))
+	root.AddCommand(validateCmd())
 	return root
+}
+
+func validateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "validate <evidence.json>",
+		Short: "Validate and admit an Evidence Contract v1 document",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := os.ReadFile(args[0])
+			if err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "invalid: could not read evidence file: %s\n", err)
+				return errEvidenceInvalid
+			}
+			if err := evidence.Validate(data); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "invalid: %s\n", err)
+				return errEvidenceInvalid
+			}
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), "valid"); err != nil {
+				return fmt.Errorf("write validation result: %w", err)
+			}
+			return nil
+		},
+	}
 }
 
 func analyzeCmd(rulesetVersion int) *cobra.Command {
