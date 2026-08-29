@@ -1,0 +1,19 @@
+{
+  "schema_version": "3",
+  "review": {"repository": "admbahm/PushBadger", "pr": 1, "base_sha": "1111111", "head_sha": "2222222", "verdict": "FAIL"},
+  "verification": [{"id": "required-suite", "type": "test", "required": true, "outcome": "PASS", "detail": "Required verification passed."}],
+  "findings": [{
+    "id": "DI-REV-001",
+    "classification": "HIGH_CONFIDENCE",
+    "severity": "medium",
+    "claim": "Observed evidence alone must not admit HIGH_CONFIDENCE.",
+    "affected_behavior": "Finding admission",
+    "locations": [{"path": "internal/review/validator.go"}],
+    "evidence": [{"type": "code_path", "qualification": "OBSERVED", "detail": "A conditional path was observed."}],
+    "expected": "The finding is rejected as insufficiently supported.",
+    "observed": "Only OBSERVED code-path evidence is present.",
+    "reproduction": ["Validate this document."],
+    "attempted_disproof": ["No STRONG or UNAVOIDABLE evidence is present."],
+    "remaining_uncertainty": ""
+  }]
+}
